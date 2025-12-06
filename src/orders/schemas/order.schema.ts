@@ -36,3 +36,4 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 
 // Index filtre + tri: find({tenantId,userId,status}).sort({createdAt:-1})
 OrderSchema.index({ tenantId: 1, userId: 1, status: 1, createdAt: -1 });
+OrderSchema.index({ tenantId: 1, status: 1, createdAt: 1 });

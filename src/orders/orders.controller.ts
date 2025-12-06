@@ -2,6 +2,8 @@ import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
 import { OrdersService } from './orders.service';
+import { DailyStatsDto } from './dto/daily-stats.dto';
+import { TopItemsDto } from './dto/top-items.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -15,5 +17,20 @@ export class OrdersController {
   @Get()
   list(@Query() q: ListOrdersDto) {
     return this.ordersService.list(q);
+  }
+
+  @Get('stats/daily')
+  daily(@Query() q: DailyStatsDto) {
+    return this.ordersService.dailyStats(q);
+  }
+
+  @Get('stats/top-items')
+  topItems(@Query() q: TopItemsDto) {
+    return this.ordersService.topItems(q);
+  }
+
+  @Get('debug/explain/list')
+  explainList(@Query() q: ListOrdersDto) {
+    return this.ordersService.explainList(q);
   }
 }
