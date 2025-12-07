@@ -4,6 +4,7 @@ import { ListOrdersDto } from './dto/list-orders.dto';
 import { OrdersService } from './orders.service';
 import { DailyStatsDto } from './dto/daily-stats.dto';
 import { TopItemsDto } from './dto/top-items.dto';
+import { ListOrdersCursorDto } from './dto/list-orders-cursor.dto';
 
 @Controller('orders')
 export class OrdersController {
@@ -32,5 +33,10 @@ export class OrdersController {
   @Get('debug/explain/list')
   explainList(@Query() q: ListOrdersDto) {
     return this.ordersService.explainList(q);
+  }
+
+  @Get('cursor')
+  listCursor(@Query() q: ListOrdersCursorDto) {
+    return this.ordersService.listCursor(q);
   }
 }

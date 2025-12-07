@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model, PipelineStage } from 'mongoose';
+import mongoose, { FilterQuery, Model, PipelineStage } from 'mongoose';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ListOrdersDto } from './dto/list-orders.dto';
 import { Order, OrderDocument } from './schemas/order.schema';
 import { DailyStatsDto } from './dto/daily-stats.dto';
 import { TopItemsDto } from './dto/top-items.dto';
+import { ListOrdersCursorDto } from './dto/list-orders-cursor.dto';
 
 @Injectable()
 export class OrdersService {
@@ -119,5 +120,45 @@ export class OrdersService {
       .sort({ createdAt: -1 })
       .limit(limit)
       .explain('executionStats');
+  }
+
+  async listCursor(q: ListOrdersCursorDto) {
+    const filter: FilterQuery<OrderDocument> = {};
+    if (q.tenantId) filter.tenantId = q.tenantId;
+    if (q.userId) filter.userId = q.userId;
+    if (q.status) filter.status = q.status;
+
+    const limit = q.limit ?? 20;
+
+    if (q.cursorCreatedAt && q.cursorId) {
+      const cDate = new Date(q.cursorCreatedAt);
+      const cId = new mongoose.Types.ObjectId(q.cursorId);
+
+      filter.$or = [
+        { createdAt: { $lt: cDate } },
+        { createdAt: cDate, _id: { $lt: cId } },
+      ];
+    }
+
+    type OrderCursorRow = { _id: mongoose.Types.ObjectId; createdAt: Date };
+
+    const rows = await this.orderModel
+      .find(filter)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit + 1)
+      .lean<OrderCursorRow[]>()
+      .exec();
+
+    const hasNext = rows.length > limit;
+    const page = hasNext ? rows.slice(0, limit) : rows;
+
+    const nextCursor = hasNext
+      ? {
+          cursorCreatedAt: page[page.length - 1].createdAt.toISOString(),
+          cursorId: String(page[page.length - 1]._id),
+        }
+      : null;
+
+    return { page, nextCursor };
   }
 }
