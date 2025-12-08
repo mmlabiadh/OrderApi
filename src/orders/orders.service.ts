@@ -15,12 +15,12 @@ export class OrdersService {
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
   ) {}
 
-  async create(dto: CreateOrderDto) {
+  async create(dto: CreateOrderDto, tenantId: string) {
     const total = dto.items.reduce((sum, i) => sum + i.price * i.qty, 0);
     const orderRef = dto.orderRef ?? randomUUID();
 
     const created = await this.orderModel.create({
-      tenantId: dto.tenantId,
+      tenantId,
       userId: dto.userId,
       status: dto.status,
       items: dto.items,

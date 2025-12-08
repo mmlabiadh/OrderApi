@@ -27,7 +27,6 @@ class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-  @IsString() @IsNotEmpty() tenantId: string;
   @IsString() @IsNotEmpty() userId: string;
 
   @IsIn(['DRAFT', 'PAID', 'CANCELLED'])
