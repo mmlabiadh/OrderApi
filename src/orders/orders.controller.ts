@@ -14,7 +14,7 @@ import { DailyStatsDto } from './dto/daily-stats.dto';
 import { TopItemsDto } from './dto/top-items.dto';
 import { ListOrdersCursorDto } from './dto/list-orders-cursor.dto';
 import type { TenantRequest } from '../common/types/tenant-request.type';
-import { TenantGuard } from 'src/common/guards/tenant.guard';
+import { TenantGuard } from '../common/guards/tenant.guard';
 
 @UseGuards(TenantGuard)
 @Controller('orders')
@@ -28,26 +28,28 @@ export class OrdersController {
 
   @Get()
   list(@Req() req: TenantRequest, @Query() q: ListOrdersDto) {
-    return this.ordersService.list({ ...q, tenantId: req.tenantId });
+    return this.ordersService.list(q, req.tenantId);
   }
 
   @Get('stats/daily')
   daily(@Req() req: TenantRequest, @Query() q: DailyStatsDto) {
-    return this.ordersService.dailyStats({ ...q, tenantId: req.tenantId });
+    return this.ordersService.dailyStats(q, req.tenantId);
   }
 
   @Get('stats/top-items')
   topItems(@Req() req: TenantRequest, @Query() q: TopItemsDto) {
-    return this.ordersService.topItems({ ...q, tenantId: req.tenantId });
+    console.log('q ctor:', q?.constructor?.name);
+    console.log('limit:', typeof q.limit, q.limit);
+    return this.ordersService.topItems(q, req.tenantId);
   }
 
   @Get('debug/explain/list')
   explainList(@Req() req: TenantRequest, @Query() q: ListOrdersDto) {
-    return this.ordersService.explainList({ ...q, tenantId: req.tenantId });
+    return this.ordersService.explainList(q, req.tenantId);
   }
 
   @Get('cursor')
   listCursor(@Req() req: TenantRequest, @Query() q: ListOrdersCursorDto) {
-    return this.ordersService.listCursor({ ...q, tenantId: req.tenantId });
+    return this.ordersService.listCursor(q, req.tenantId);
   }
 }

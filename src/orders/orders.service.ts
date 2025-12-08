@@ -31,10 +31,10 @@ export class OrdersService {
     return created;
   }
 
-  async list(q: ListOrdersDto) {
+  async list(q: ListOrdersDto, tenantId: string) {
     const filter: FilterQuery<OrderDocument> = {};
 
-    if (q.tenantId) filter.tenantId = q.tenantId;
+    if (tenantId) filter.tenantId = tenantId;
     if (q.userId) filter.userId = q.userId;
     if (q.status) filter.status = q.status;
 
@@ -48,18 +48,19 @@ export class OrdersService {
       .exec();
   }
 
-  async dailyStats(q: DailyStatsDto) {
+  async dailyStats(q: DailyStatsDto, tenantId: string) {
     const from = new Date(q.from);
     const to = new Date(q.to);
 
     const match = {
-      tenantId: q.tenantId,
+      tenantId,
       createdAt: { $gte: from, $lte: to },
       ...(q.status ? { status: q.status } : {}),
     };
 
     const pipeline: PipelineStage[] = [
       { $match: match },
+      { $match: { total: { $type: 'number' } } },
       { $project: { createdAt: 1, total: 1 } },
       {
         $group: {
@@ -75,7 +76,8 @@ export class OrdersService {
     return this.orderModel.aggregate(pipeline).exec();
   }
 
-  async topItems(q: TopItemsDto) {
+  async topItems(q: TopItemsDto, tenantId: string) {
+    console.log('limit type/value:', typeof q.limit, q.limit);
     const from = new Date(q.from);
     const to = new Date(q.to);
     const limit = q.limit ?? 10;
@@ -85,13 +87,14 @@ export class OrdersService {
       createdAt: any;
       status?: 'DRAFT' | 'PAID' | 'CANCELLED';
     } = {
-      tenantId: q.tenantId,
+      tenantId,
       createdAt: { $gte: from, $lte: to },
       ...(q.status ? { status: q.status } : {}),
     };
 
     const pipeline: PipelineStage[] = [
       { $match: match },
+      { $match: { items: { $type: 'array' } } },
       { $project: { items: 1 } },
       { $unwind: '$items' },
       {
@@ -110,9 +113,9 @@ export class OrdersService {
     return this.orderModel.aggregate(pipeline).exec();
   }
 
-  async explainList(q: ListOrdersDto) {
+  async explainList(q: ListOrdersDto, tenantId: string) {
     const filter: FilterQuery<OrderDocument> = {};
-    if (q.tenantId) filter.tenantId = q.tenantId;
+    if (tenantId) filter.tenantId = tenantId;
     if (q.userId) filter.userId = q.userId;
     if (q.status) filter.status = q.status;
 
@@ -125,9 +128,9 @@ export class OrdersService {
       .explain('executionStats');
   }
 
-  async listCursor(q: ListOrdersCursorDto) {
+  async listCursor(q: ListOrdersCursorDto, tenantId: string) {
     const filter: FilterQuery<OrderDocument> = {};
-    if (q.tenantId) filter.tenantId = q.tenantId;
+    if (tenantId) filter.tenantId = tenantId;
     if (q.userId) filter.userId = q.userId;
     if (q.status) filter.status = q.status;
 

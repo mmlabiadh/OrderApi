@@ -1,13 +1,6 @@
-import {
-  IsIn,
-  IsISO8601,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsIn, IsISO8601, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class DailyStatsDto {
-  @IsString() @IsNotEmpty() tenantId: string;
   @IsISO8601() @IsNotEmpty() from: string;
   @IsISO8601() @IsNotEmpty() to: string;
 

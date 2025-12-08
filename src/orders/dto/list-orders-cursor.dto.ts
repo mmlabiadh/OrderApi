@@ -2,7 +2,6 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class ListOrdersCursorDto {
-  @IsOptional() @IsString() tenantId?: string;
   @IsOptional() @IsString() userId?: string;
 
   @IsOptional()

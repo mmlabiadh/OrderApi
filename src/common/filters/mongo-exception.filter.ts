@@ -30,7 +30,10 @@ export class MongoExceptionFilter implements ExceptionFilter {
       });
     }
 
-    // Not handled: let Nest default handler deal with it
-    throw exception;
+    return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+      error: 'Internal Server Error',
+      message: 'MongoDB error',
+    });
   }
 }

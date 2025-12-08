@@ -5,16 +5,11 @@ import {
   IsISO8601,
   IsNotEmpty,
   IsOptional,
-  IsString,
   Max,
   Min,
 } from 'class-validator';
 
 export class TopItemsDto {
-  @IsString()
-  @IsNotEmpty()
-  tenantId: string;
-
   @IsISO8601()
   @IsNotEmpty()
   from: string;
