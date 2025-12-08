@@ -7,6 +7,7 @@ import { Order, OrderDocument } from './schemas/order.schema';
 import { DailyStatsDto } from './dto/daily-stats.dto';
 import { TopItemsDto } from './dto/top-items.dto';
 import { ListOrdersCursorDto } from './dto/list-orders-cursor.dto';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class OrdersService {
@@ -16,6 +17,7 @@ export class OrdersService {
 
   async create(dto: CreateOrderDto) {
     const total = dto.items.reduce((sum, i) => sum + i.price * i.qty, 0);
+    const orderRef = dto.orderRef ?? randomUUID();
 
     const created = await this.orderModel.create({
       tenantId: dto.tenantId,
@@ -23,6 +25,7 @@ export class OrdersService {
       status: dto.status,
       items: dto.items,
       total,
+      orderRef,
     });
 
     return created;

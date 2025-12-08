@@ -30,6 +30,9 @@ export class Order {
 
   @Prop({ required: true, min: 0 })
   total: number;
+
+  @Prop({ required: false }) // on reste permissif pour les vieux docs
+  orderRef?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
