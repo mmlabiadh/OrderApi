@@ -1,98 +1,226 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Orders API — NestJS + MongoDB (Mongoose)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API pédagogique construite étape par étape pour pratiquer NestJS + MongoDB (Mongoose) avec un focus sur :
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- aggregation pipelines MongoDB
+- indexation et preuves chiffrées de performance
+- pagination cursor (seek)
+- multi-tenant simulation (guard)
+- gestion d’erreurs Mongo (E11000 -> 409)
+- tests E2E (Jest + Supertest)
 
-## Description
+---
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 1) Architecture NestJS (rappels)
 
-## Project setup
+- **Controller** : expose les routes HTTP.
+- **Service** : logique métier (create/list/stats).
+- **DTO** (Data Transfer Object) : classes qui décrivent/valident les payloads (`@Body()`, `@Query()`).
+- **ValidationPipe** (global) :
+  - `whitelist: true` : supprime les champs non déclarés dans le DTO.
+  - `forbidNonWhitelisted: true` : renvoie 400 si le client envoie un champ non attendu.
+  - `transform: true` : convertit les types (ex. query `limit=5` -> `number`) si le DTO le demande.
 
-```bash
-$ npm install
-```
+Point clé : `transform: true` fonctionne avec `@Type(() => Number)` (class-transformer) sur les champs numériques des DTO.
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## 2) Modèle de données MongoDB (Mongoose)
 
-# watch mode
-$ npm run start:dev
+Collection : `orders`
 
-# production mode
-$ npm run start:prod
-```
+Champs principaux :
 
-## Run tests
+- `tenantId` (isolation multi-tenant)
+- `userId`
+- `status` : `DRAFT | PAID | CANCELLED`
+- `items[]` : `{ sku, price, qty }`
+- `total` : calculé côté backend (ne pas faire confiance au client)
+- `createdAt/updatedAt` via `timestamps: true`
 
-```bash
-# unit tests
-$ npm run test
+Point clé : avec `timestamps: true`, `createdAt` est ajouté automatiquement.
 
-# e2e tests
-$ npm run test:e2e
+---
 
-# test coverage
-$ npm run test:cov
-```
+## 3) Aggregation pipelines MongoDB (stages)
 
-## Deployment
+MongoDB aggregation = enchaînement d’étapes exécutées **dans l’ordre**.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- `$match` : filtre (équivalent WHERE). **Critique pour la perf**.
+- `$project` : garde/transforme les champs.
+- `$group` : agrège (sum/count/etc.).
+- `$unwind` : “explose” un tableau -> 1 doc par élément.
+- `$sort` : tri.
+- `$limit` : limite de résultats.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Daily stats
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+Objectif : revenu + count par jour.
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- regroupement par jour via `$dateTrunc`
+- somme de `total` + comptage.
 
-## Resources
+Robustesse : filtrer les docs incohérents :
 
-Check out a few resources that may come in handy when working with NestJS:
+- `$match: { total: { $type: "number" } }`
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Top-items
 
-## Support
+Objectif : stats par SKU (qty, revenue, lines).
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- `$unwind: "$items"` pour transformer 1 order (plusieurs items) en 1 doc par item.
+- `$group` par `items.sku`.
+- `lines = $sum: 1` = nombre de lignes d’items (différent de `qty`).
 
-## Stay in touch
+Robustesse :
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- `$match: { items: { $type: "array" } }` avant `$unwind` pour éviter les 500 sur données “sales”.
 
-## License
+---
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 4) Indexation MongoDB et performance
+
+Un index MongoDB est stocké sous forme d’**arbre équilibré (B-tree)**.
+Effet : trouver une clé/plage de clés en **log(N)** au lieu de scanner N documents.
+
+Pour prouver la perf, on utilise :
+
+- `explain("executionStats")`
+- métriques clés :
+  - `totalDocsExamined`
+  - `totalKeysExamined`
+  - `indexName` (quel index a gagné)
+- `hint()` pour forcer un index (benchmark/debug), pas pour du code prod par défaut.
+
+---
+
+## 5) Preuves chiffrées “avant / après” (explain + hint)
+
+On a généré un dataset de “bruit” (beaucoup d’orders récents non matchants) pour rendre l’impact visible.
+
+### A) Listing (find + sort + limit)
+
+Requête : filtre `{tenantId,userId,status}` + tri `createdAt desc` + `limit 20`
+
+- Avant (forcer `createdAt_1`) :
+  - `totalDocsExamined ≈ 2020`
+  - `totalKeysExamined ≈ 2020`
+- Après (index composé optimal) :
+  - `totalDocsExamined = 20`
+  - `totalKeysExamined = 20`
+
+Index optimal :
+
+- `{ tenantId: 1, userId: 1, status: 1, createdAt: -1 }`
+  Concept clé : **index qui couvre filtre + sort + limit** => lecture directe + arrêt au limit.
+
+### B) Pipeline top-items
+
+Même logique : la perf dépend surtout du `$match` (premier stage) et de son index.
+
+- Avant (scan brut) : `totalDocsExamined = 2101`
+- Après (index `{tenantId,status,createdAt}`) : `totalDocsExamined = 101`
+
+Conclusion : plus tôt `$match` filtre et plus il est indexable, moins `$unwind/$group` traitent de docs.
+
+---
+
+## 6) Pagination cursor (seek pagination)
+
+Deux types :
+
+### Offset pagination (skip)
+
+- `skip + limit`
+- perf se dégrade quand on va loin (skip coûte cher)
+- instable si de nouveaux docs arrivent (doublons/sauts)
+
+### Cursor pagination (seek)
+
+- tri déterministe `(createdAt desc, _id desc)`
+- cursor = `{cursorCreatedAt, cursorId}` (dernier élément de la page précédente)
+- condition de reprise :
+  - `createdAt < cursorCreatedAt`
+  - OR (`createdAt == cursorCreatedAt` AND `_id < cursorId`)
+- perf quasi constante et stable.
+
+Index dédié :
+
+- `{ tenantId: 1, userId: 1, status: 1, createdAt: -1, _id: -1 }`
+
+Endpoint :
+
+- `GET /orders/cursor` -> retourne `{ page, nextCursor }`
+
+---
+
+## 7) Multi-tenant simulation (Guard)
+
+On a simulé un contexte multi-tenant via un header :
+
+- `x-tenant-id`
+
+### Pourquoi un guard ?
+
+- Un tenant ne doit pas venir du body/query (sinon contournement de l’isolation).
+- Un **Guard** est le mécanisme standard pour autoriser/refuser une requête avant d’entrer dans le handler.
+
+On a :
+
+- `TenantGuard` qui lit `x-tenant-id`
+- injection dans `req.tenantId`
+- suppression de `tenantId` des DTO publics (ou rendu non utilisable) et injection côté serveur.
+
+Typage propre (sans `any`) :
+
+- `TenantRequest = Request & { tenantId: string }` (intersection type `&`)
+- `import type` pour `TenantRequest` dans les signatures décorées quand `isolatedModules` + `emitDecoratorMetadata` sont activés.
+
+---
+
+## 8) Gestion d’erreurs Mongo : E11000 -> 409
+
+- Ajout d’un index unique réaliste : `(tenantId, orderRef)`
+- `orderRef` sert d’identifiant métier unique par tenant
+- index unique partiel possible (`partialFilterExpression`) pour éviter de casser les anciens docs.
+
+Quand Mongo renvoie `E11000 duplicate key` :
+
+- on mappe vers HTTP **409 Conflict** via un Exception Filter.
+
+Point clé : ne pas faire un `@Catch()` catch-all. Le filter doit catcher les erreurs Mongo uniquement, sinon il perturbe les erreurs Nest (ValidationPipe etc.).
+
+---
+
+## 9) Tests E2E : Jest + Supertest
+
+**Supertest** envoie des requêtes HTTP vers `app.getHttpServer()` (sans port réseau).
+On valide :
+
+- guard (header manquant -> 400/401)
+- create order
+- cursor pagination
+- daily stats
+- top-items
+
+Piège important résolu :
+
+- En E2E, `main.ts` n’est pas exécuté.
+- Donc les global pipes/filters/interceptors définis dans `main.ts` doivent être enregistrés aussi dans le bootstrap E2E (beforeAll), sinon `transform: true` ne s’applique pas et `limit` reste string, ce qui casse `$limit`.
+
+Bon pattern :
+
+- `setupApp(app)` partagé entre `main.ts` et les tests E2E pour éviter les divergences.
+
+---
+
+## Glossaire (termes clés)
+
+- DTO : classe de validation/typing pour les entrées HTTP.
+- ValidationPipe : applique validation + whitelist + transform.
+- Aggregation pipeline : suite de stages Mongo ($match/$group/$unwind…).
+- Index composé : index sur plusieurs champs dans un ordre donné.
+- `explain("executionStats")` : métriques réelles d’exécution (docs/keys examinés).
+- `hint()` : force un index pour benchmark/debug.
+- Cursor pagination (seek) : pagination basée sur des valeurs triées (createdAt/\_id).
+- Guard : contrôle d’accès avant handler (idéal pour tenant/auth).
